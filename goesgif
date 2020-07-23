@@ -56,7 +56,7 @@ fi
 
 rm -f /tmp/GOES_frame_*.jpg
 
-if [[ ! -f "/tmp/GOES_loop_${area}_${data}.gif" ]] || [[ ! -f "/tmp/GOES_${area}_${data}.dat" ]] || [[ $(( (`date +%s` - `stat -L --format %Y /tmp/GOES_${area}_${data}.dat`) > (1) )) == "1" ]]; then
+if [[ ! -f "/tmp/GOES_loop_${area}_${data}.gif" ]] || [[ ! -f "/tmp/GOES_${area}_${data}.dat" ]] || [[ $(( (`date +%s` - `stat -L --format %Y /tmp/GOES_${area}_${data}.dat`) > (5*60) )) == "1" ]]; then
 
     notify-send "🌦 Consultando satelite.inmet.gov.br" "Por favor, aguarde..."
     
