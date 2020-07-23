@@ -30,11 +30,12 @@ E _data_ =
 Exemplos:
 
     ./goesgif BR
+
     ./goesgif SE 2020-07-22
 
 Nota: O GIF gerado para a área/data selecionada será reutilizado em chamadas posteriores se tiver sido gerado há menos de 5 minutos.
 
-## Dependências:
+## Dependências
 
 - curl                          https://curl.haxx.se/download.html
 - jq                            https://stedolan.github.io/jq/download/
