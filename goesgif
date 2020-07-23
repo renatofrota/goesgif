@@ -1,0 +1,92 @@
+#!/bin/bash
+
+if [[ "$1" =~ ^(AS|BR|CO|DF|N|NE|S|SE)$ ]]; then
+    area=$1
+else
+    echo "
+    GOES GIF
+    
+        Gera um GIF animado com as imagens captadas no dia pelo satélite GOES, disponíveis em https://satelite.inmet.gov.br/
+    
+    Uso:
+
+        $0 <área> [<data>]
+
+    Onde <área> =
+
+        - AS (América do Sul);
+        - BR (Brasil);
+        - CO (Centro-Oeste);
+        - DF (Distrito Federal);
+        - N  (Norte);
+        - NE (Nordeste);
+        - S  (Sul) ou
+        - SE (Sudeste)
+
+    E <data> =
+
+        - em branco (ou omitido) para hoje ou
+        - data no formato YYYY-MM-DD
+
+    Exemplos:
+
+        $0 BR
+        $0 SE 2020-07-22
+
+    Nota:
+
+        O GIF gerado para a área selecionada será reutilizado em chamadas posteriores se tiver sido gerado há menos de 5 minutos.
+
+    Dependências:
+
+        - curl                          https://curl.haxx.se/download.html
+        - jq                            https://stedolan.github.io/jq/download/
+        - mpv                           https://mpv.io/installation/
+        - notify-send (libnotify4)      https://pypi.org/project/notify-send/#files
+        - base64 (coreutils)            https://ftp.gnu.org/gnu/coreutils/
+
+        - ffmpeg (recomendado!)         https://ffmpeg.org/download.html
+            ou
+        - convert (imagemagick)         https://imagemagick.org/script/download.php
+"
+    exit 1
+fi
+
+[[ ! -z $2 ]] && data=$2 || data=$(date +%Y-%m-%d)
+
+rm -f /tmp/GOES_frame_*.jpg
+
+if [[ ! -f "/tmp/GOES_loop_${area}_${data}.gif" ]] || [[ ! -f "/tmp/GOES_${area}_${data}.dat" ]] || [[ $(( (`date +%s` - `stat -L --format %Y /tmp/GOES_${area}_${data}.dat`) > (1) )) == "1" ]]; then
+
+    notify-send "🌦 Consultando satelite.inmet.gov.br" "Por favor, aguarde..."
+    
+    curl -s https://apisat.inmet.gov.br/GOES/${area}/TN/${data} >/tmp/GOES_${area}_${data}.json || { notify-send "⛈ Falha na consulta!" "Tente novamente mais tarde."; exit 1; }
+
+    notify-send "🌤 Download completo!" "Extraindo imagens..."
+    
+    jq 'sort_by(.nome) | .[].base64' /tmp/GOES_${area}_${data}.json >/tmp/GOES_${area}_${data}.imgs || { notify-send "⛈ Falha no processamento do arquivo JSON!" "Você tem o pacote jq instalado?"; exit 1; }
+
+    i=0
+    for image in $( cat /tmp/GOES_${area}_${data}.imgs | cut -d '"' -f 2 | cut -d ',' -f 2- )
+    do
+        let i++
+        echo ${image} | base64 -d > /tmp/GOES_frame_${i}.jpg || { "⛈ Falha na decodificação da imagem em base64!" "Você tem o binário base64 (pacote coreutils) instalado?"; exit 1; }
+    done
+
+    notify-send "🌤 Extração completa!" "Transformando imagens em GIF..."
+
+    ffmpeg -y -framerate 3 -i '/tmp/GOES_frame_%d.jpg' -r 60 -vf scale=1024:-1 /tmp/GOES_loop_${area}_${data}.gif || convert -delay 30 -loop 0 $(ls /tmp/GOES_frame_*.jpg | sort -n -t _ -k 3) /tmp/GOES_loop_${area}_${data}.gif || { notify-send "⛈ Falha na criação do GIF!" "Você tem o pacote ffmpeg ou imagemagick instalado?"; exit 1; }
+    
+    date +%s > /tmp/GOES_${area}_${data}.dat
+    notify-send "🌤 GIF da área ${area} gerado!" "Abrindo..."
+    
+else
+    notify-send "🌦 GIF da área ${area} em cache!" "Carregando..."
+fi
+
+rm -f /tmp/GOES_*.jpg
+rm -f /tmp/GOES_*.imgs
+rm -f /tmp/GOES_*.json
+
+mpv --no-osc --loop-file=inf /tmp/GOES_loop_${area}_${data}.gif
+
